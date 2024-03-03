@@ -2,6 +2,33 @@
 
 { config, pkgs, ... }:
 
+let
+  userConfig = {
+    name = "debug";
+    homeDir = "/home/debug";
+    description = "Debug user";
+    extraGroups = [ "networkmanager" "wheel" ];
+    packages = with pkgs; [
+      wget
+      appimage-run
+      # Add "just for me" packages here
+      signal-desktop
+      gh
+      nix
+      discord
+      slack
+      steam
+      brave
+      zoom-us
+      ulauncher
+      obs-studio
+      vlc
+      neofetch
+      # Any other personal packages
+    ];
+  };
+in
+
 {
   # First things first, we're telling our system about the hardware it's running on. Think of it as introducing your computer to its own body.
   imports = [ ./hardware-configuration.nix ];
@@ -66,72 +93,34 @@
   security.rtkit.enable = true; # Real-time privileges for audio applications.
 
   # User setup. Here's where I define my user account on this computer.
-  users.users.debug = {
+  users.users.${userConfig.name} = {
     isNormalUser = true; # Yes, it's a regular user account.
-    home = "/home/debug"; # Home directory.
+    home = userConfig.homeDir; # Home directory.
     createHome = true; # Automatically create the home directory.
-    description = "Debug user"; # A simple description.
-    extraGroups = [ "networkmanager" "wheel" ]; # Adding to useful groups.
-    packages = with pkgs; [ wget appimage-run ]; # Some packages I want available to this user.
-  // isSystemUser = false; # If this is a system account, not a regular user.
-  // shell = "/run/current-system/sw/bin/bash"; # Default shell for the user.
-  // uid = 1001; # Specify a unique user ID.
-  // password = "hashed_password_here"; # User's hashed password.
-  // passwordFile = "/path/to/password/file"; # Path to a file containing the user's hashed password.
-  // openssh.authorizedKeys.keys = [ "ssh-rsa AAAAB3Nza... user@hostname" ]; # SSH public keys for remote access.
-  // useDefaultShell = true; # Whether to use the NixOS default shell.
-  // group = "users"; # Primary group for the user.
-  // dontSetUser = true; # Do not set up the user (useful in conjunction with mutableUsers = false).
-  // hashedPassword = "hashed_password_here"; # The hashed password for the user.
-  // initialHashedPassword = "initial_hashed_password_here"; # Initial hashed password for the user.
-  // initialPassword = "initial_password_here"; # Initial password for the user.
-  // passwordAge = { maxDays = 60; minDays = 7; warnDays = 7; }; # Password aging settings.
-  // openssh.authorizedKeys.keyFiles = [ "/path/to/public/key" ]; # Files containing SSH public keys for remote access.
+    description = userConfig.description; # A simple description.
+    extraGroups = userConfig.extraGroups; # Adding to useful groups.
+    packages = userConfig.packages; # Some packages I want available to this user.
   };
 
   # Package management. Here we're allowing 'unfree' packages, which are not open source.
   nixpkgs.config.allowUnfree = true;
   # Defining a list of system-wide packages for easier management and expansion.
-  let
-    systemPackagesList = [
-      # essential packages for my own personal operating system
-      # base useful packages in all environments
-      pkgs.vim, # A highly configurable text editor built to enable efficient text editing
-      pkgs.ripgrep, # A line-oriented search tool that recursively searches your current directory for a regex pattern
-      pkgs.fd, # A simple, fast and user-friendly alternative to 'find'
-      pkgs.wget, # A free utility for non-interactive download of files from the Web
-      pkgs.appimage-run, # Tool to run AppImage files
-      pkgs.git, # A free and open source distributed version control system
-      pkgs.mongodb, # A general purpose, document-based, distributed database built for modern application developers and for the cloud era
-      
-      # just for me
-      pkgs.signal-desktop, # Signal Private Messenger for Windows, Mac, and Linux
-      pkgs.gh, # GitHub CLI tool to work with GitHub from the command line
-      pkgs.nix, # A powerful package manager for Linux and other Unix systems that makes package management reliable and reproducible
-      pkgs.discord, # All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone
-      pkgs.slack, # A cloud-based set of proprietary team collaboration tools and services
-      pkgs.steam, # A digital distribution platform for video games
-      pkgs.brave, # A free and open-source web browser developed by Brave Software, Inc. based on the Chromium web browser
-      pkgs.zoom-us, # A remote conferencing services company that combines video conferencing, online meetings, chat, and mobile collaboration
-      pkgs.ulauncher, # A fast application launcher for Linux
-      
-      # python
-      pkgs.python3, # A programming language that lets you work quickly and integrate systems more effectively
+  environment.systemPackages = with pkgs; [
+    # essential packages for my own personal operating system
+    # base useful packages in all environments
+    vim, # A highly configurable text editor built to enable efficient text editing
+    ripgrep, # A line-oriented search tool that recursively searches your current directory for a regex pattern
+    fd, # A simple, fast and user-friendly alternative to 'find'
+    wget, # A free utility for non-interactive download of files from the Web
+    appimage-run, # Tool to run AppImage files
+    git, # A free and open source distributed version control system
+    mongodb, # A general purpose, document-based, distributed database built for modern application developers and for the cloud era
+    htop, # An interactive process viewer for Unix systems
 
-      # Additional packages added for enhanced functionality
-      pkgs.neofetch, # A command-line system information tool that displays your system information in an aesthetic and visually pleasing way
-      pkgs.htop, # An interactive process viewer for Unix systems
-      pkgs.tldr, # A community-driven man pages simplified and community-driven man pages
-      pkgs.vlc, # A free and open-source, portable, cross-platform media player and streaming media server
+    # python
+    python3, # A programming language that lets you work quickly and integrate systems more effectively
 
-    ];
-
-
-      # Add more packages here as needed.
-    ];
-  in
-  environment.systemPackages = with pkgs; systemPackagesList;
-
+  ];
   # The systemd configuration section is dedicated to setting up system services and tasks automatically.
   systemd = {
     # This rule ensures the creation of a directory specifically for storing applications. It sets the directory permissions to 0755, making it readable and executable by everyone but writable only by the user 'debug'. The directory is owned by 'debug' and belongs to the 'users' group.
@@ -173,3 +162,4 @@
   # Finally, we're setting the version of the system state. This helps with upgrades and troubleshooting.
   system.stateVersion = "23.11"; # The version of NixOS this configuration is designed for.
 }
+
