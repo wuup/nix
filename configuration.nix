@@ -102,16 +102,16 @@ in
   # Allowing 'unfree' packages and defining system-wide essentials.
   nixpkgs.config.allowUnfree = true;
   environment.systemPackages = with pkgs; [
-    vim,
-    ripgrep,
-    fd,
-    wget,
-    appimage-run,
-    git,
-    mongodb,
-    htop,
-    python3,
-    python311Packages.pip,
+    vim
+    ripgrep
+    fd
+    wget
+    appimage-run
+    git
+    mongodb
+    htop
+    python3
+    python311Packages.pip
   ];
 
   # Systemd setup for services and tasks.
