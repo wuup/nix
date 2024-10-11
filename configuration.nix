@@ -56,8 +56,6 @@ in
     brave
     discord
     google-chrome
-    mongodb-compass
-    teamspeak_client
     steam
     steam-run
     vscode
