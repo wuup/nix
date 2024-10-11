@@ -1,5 +1,9 @@
 { config, pkgs, lib, ... }:
-
+let
+  unstable = import
+    (builtins.fetchTarball https://github.com/nixos/nixpkgs/tarball/nixos-unstable)
+    { config = config.nixpkgs.config; };
+in
 {
   imports = [ ./hardware-configuration.nix ];
 
@@ -10,37 +14,18 @@
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
   networking.nameservers = [ "1.1.1.1" "1.0.0.1" ]; 
-  
-  time.timeZone = "America/New_York";
 
+  time.timeZone = "America/New_York";
   i18n.defaultLocale = "en_US.UTF-8";
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_US.UTF-8";
-    LC_IDENTIFICATION = "en_US.UTF-8";
-    LC_MEASUREMENT = "en_US.UTF-8";
-    LC_MONETARY = "en_US.UTF-8";
-    LC_NAME = "en_US.UTF-8";
-    LC_NUMERIC = "en_US.UTF-8";
-    LC_PAPER = "en_US.UTF-8";
-    LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
-  };
 
   services.xserver.enable = true;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  services.ntp.enable = true;
-
-  services.xserver.xkb = {
-    layout = "us";
-    variant = "";
-  };
 
   services.printing.enable = false;
-
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
-  
+
   services.pipewire = {
     enable = true;
     alsa.enable = true;
@@ -83,12 +68,19 @@
     signal-desktop
     protonmail-bridge
     vim
+
+    # Add unstable packages here
+    unstable.code-cursor
   ];
 
   services.xserver.videoDrivers = [ "nvidia" ];
 
   hardware.nvidia.modesetting.enable = true;
-  hardware.nvidia.powerManagement.enable = true;
+  hardware.nvidia.powerManagement = {
+    enable = true;
+    preferredMode = "maximum_performance";
+  };
+
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.extraPackages = with pkgs.pkgsi686Linux; [ libGL vulkan-loader ];
 
@@ -107,10 +99,10 @@
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/edd63e45-be15-42f1-b2b1-026d039720de";
     fsType = "ext4";
-    options = [ "noatime" "discard" ];
+    options = [ "noatime" "nodiratime" "discard" ];
   };
 
-  powerManagement.cpuFreqGovernor = "schedutil";
+  powerManagement.cpuFreqGovernor = "performance";
 
   services.journald.extraConfig = ''
     SystemMaxUse=200M
@@ -118,10 +110,12 @@
     MaxFileSec=1day
   '';
 
+  services.journald.storage = "volatile";
+
   nix.settings.cores = 0;
 
   boot.kernel.sysctl = {
-    "vm.swappiness" = 20;
+    "vm.swappiness" = 10;
   };
 
   system.stateVersion = "24.05";
