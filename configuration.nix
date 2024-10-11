@@ -1,47 +1,78 @@
 { config, pkgs, lib, ... }:
+
 let
   unstable = import
-    (builtins.fetchTarball https://github.com/nixos/nixpkgs/tarball/nixos-unstable)
+    (builtins.fetchTarball "https://github.com/nixos/nixpkgs/tarball/nixos-unstable")
     { config = config.nixpkgs.config; };
 in
 {
-  imports = [ ./hardware-configuration.nix ];
+  imports = [
+    ./hardware-configuration.nix
+    # Import Home Manager as a NixOS module
+    (import (builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-23.05.tar.gz") + "/nixos")
+  ];
 
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
+
+  # Bootloader configuration
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # Networking configuration
   networking.hostName = "nixos";
   networking.networkmanager.enable = true;
-  networking.firewall.enable = true;
-  networking.nameservers = [ "1.1.1.1" "1.0.0.1" ]; 
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [ 22 80 443 ];  # Open ports for SSH and web
+    allowedUDPPorts = [ 53 123 ];     # DNS and NTP
+  };
+  networking.nameservers = [ "1.1.1.1" "1.0.0.1" ];
 
+  # Localization settings
   time.timeZone = "America/New_York";
   i18n.defaultLocale = "en_US.UTF-8";
 
-  services.xserver.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-
-  services.printing.enable = false;
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-
-  services.pipewire = {
+  # X server and desktop environment
+  services.xserver = {
     enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
+    videoDrivers = [ "nvidia" ];
+    displayManager.gdm = {
+      enable = true;
+      wayland = true;  # Explicitly enable Wayland
+    };
+    desktopManager.gnome.enable = true;
   };
 
+  # Printing services
+  services.printing.enable = false;
+
+  # Audio configuration with Pipewire
+  services.pipewire = {
+    enable = true;
+    alsa = {
+      enable = true;
+      support32Bit = true;
+    };
+    pulse = {
+      enable = true;
+      support32Bit = true;
+    };
+  };
+  security.rtkit.enable = true;
+
+  # User configuration
   users.users.debug = {
     isNormalUser = true;
     description = "Alan Hamlyn";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    # Home directory is set by default to /home/debug
   };
 
-  programs.firefox.enable = true;
-  nixpkgs.config.allowUnfree = true;
+  # Nix settings
+  nix.settings.cores = 4;
 
+  # System packages
   environment.systemPackages = with pkgs; [
     firefox
     libreoffice
@@ -66,119 +97,111 @@ in
     signal-desktop
     protonmail-bridge
     vim
-
-    # Unstable packages
-    unstable.code-cursor
-
-    # Bottom (btm) for system resource monitoring
-    bottom
-
-    # Disk Usage Analyzer
-    qdirstat
-
-    # JetBrains DataGrip for database management
-    jetbrains.datagrip
-
-    # OnlyOffice for office productivity
-    onlyoffice-bin_latest
+    appimage-run             # AppImage support
+    unstable.code-cursor     # Unstable package
+    bottom                   # System resource monitoring
+    qdirstat                 # Disk usage analyzer
+    jetbrains.datagrip       # JetBrains DataGrip
+    onlyoffice-bin_latest    # OnlyOffice
   ];
 
-  # Docker and VirtualBox Virtualization
-  virtualisation.docker.enable = true;
-  virtualisation.virtualbox.host.enable = true;
-
-  services.xserver.videoDrivers = [ "nvidia" ];
-
-  hardware.nvidia.modesetting.enable = true;
-  hardware.nvidia.powerManagement = {
-    enable = true;
-    preferredMode = "maximum_performance";
-  };
-
-  hardware.opengl.driSupport32Bit = true;
-  hardware.opengl.extraPackages = with pkgs.pkgsi686Linux; [ libGL vulkan-loader ];
-
-  services.flatpak.enable = true;
-  services.mongodb.enable = true;
-
-  boot.kernelParams = [ "zswap.enabled=1" "zswap.compressor=lz4" "zswap.max_pool_percent=20" "kernel.perf_event_paranoid=2" "quiet" ];
-
-  fileSystems."/tmp" = {
-    device = "tmpfs";
-    fsType = "tmpfs";
-    options = [ "size=4G" "mode=1777" ];
-  };
-
-  fileSystems."/" = {
-    device = "/dev/disk/by-uuid/edd63e45-be15-42f1-b2b1-026d039720de";
-    fsType = "ext4";
-    options = [ "noatime" "nodiratime" "discard" ];
-  };
-
-  powerManagement.cpuFreqGovernor = "performance";
-
-  services.journald.extraConfig = ''
-    SystemMaxUse=200M
-    RuntimeMaxUse=100M
-    MaxFileSec=1day
-  '';
-
-  services.journald.storage = "volatile";
-
-  nix.settings.cores = 0;
-
-  boot.kernel.sysctl = {
-    "vm.swappiness" = 10;
-  };
-
-  # AppImage support
-  boot.binfmt.registrations.appimage = {
-    wrapInterpreterInShell = false;
-    interpreter = "${pkgs.appimage-run}/bin/appimage-run";
-    recognitionType = "magic";
-    offset = 0;
-    mask = ''\xff\xff\xff\xff\x00\x00\x00\x00\xff\xff\xff'';
-    magicOrExtension = ''\x7fELF....AI\x02'';
-  };
-
-  # Create Applications directory for users
-  systemd.tmpfiles.rules = [
-    "d /home/debug/Applications 0755 debug users - -"
+  # GNOME extensions
+  environment.gnomeExtensions = with pkgs.gnomeExtensions; [
+    dash-to-dock
+    gnome-shell-pomodoro
+    gnome-shell-system-monitor
   ];
 
-  # SSH Key Generation Service
-  systemd.services.generateSSHKey = {
-    description = "Generate SSH Key for GitHub";
-    after = [ "network.target" ];
-    wantedBy = [ "multi-user.target" ];
-    path = [ pkgs.openssh pkgs.coreutils pkgs.su ];
-    script = ''
-      for USER in debug; do
-        ${pkgs.su}/bin/su - $USER -c '
-          SSH_DIR="/home/$USER/.ssh"
-          mkdir -p $SSH_DIR
-          chmod 700 $SSH_DIR
+  # Virtualization
+  virtualisation = {
+    docker.enable = true;
+    virtualbox.host.enable = true;  # Only enable the host component
+    # Removed virtualbox.guest.enable to prevent conflicts
+  };
 
-          SSH_KEY_PATH="$SSH_DIR/github_ed25519"
+  # NVIDIA configuration
+  hardware.nvidia = {
+    modesetting.enable = true;
+    powerManagement = {
+      enable = true;
+      preferredMode = "maximum_performance";
+    };
+  };
+  hardware.opengl = {
+    driSupport32Bit = true;
+    extraPackages = with pkgs.pkgsi686Linux; [ libGL vulkan-loader ];
+  };
 
-          if [ ! -f $SSH_KEY_PATH ]; then
-            ssh-keygen -t ed25519 -C "$USER@github" -f $SSH_KEY_PATH -N ""
-            chmod 600 $SSH_KEY_PATH
-            chmod 644 $SSH_KEY_PATH.pub
-            eval "$(ssh-agent -s)"
-            ssh-add $SSH_KEY_PATH
-            echo "SSH key generated successfully for $USER."
-          else
-            echo "SSH key already exists for $USER. Skipping generation."
-          fi
-        '
-      done
-    '';
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
+  # Additional services
+  services = {
+    flatpak.enable = true;
+    mongodb.enable = true;
+    journald = {
+      storage = "volatile";
+      extraConfig = ''
+        SystemMaxUse=200M
+        RuntimeMaxUse=100M
+        MaxFileSec=1day
+      '';
     };
   };
 
-  system.stateVersion = "24.05";
+  # Kernel parameters and sysctl settings
+  boot = {
+    kernelParams = [ "quiet" ];
+    kernel = {
+      zswap = {
+        enable = true;
+        compressor = "lz4";
+        maxPoolPercent = 20;
+      };
+      sysctl = {
+        "vm.swappiness" = 10;
+        "kernel.perf_event_paranoid" = 2;
+      };
+    };
+  };
+
+  # File system configuration
+  fileSystems = {
+    "/tmp" = {
+      device = "tmpfs";
+      fsType = "tmpfs";
+      options = [ "size=4G" "mode=1777" ];
+    };
+    "/" = {
+      device = "/dev/disk/by-uuid/edd63e45-be15-42f1-b2b1-026d039720de";
+      fsType = "ext4";
+      options = [ "noatime" "nodiratime" ];
+      autoTrimInterval = "weekly";  # Use autoTrimInterval instead of discard
+    };
+  };
+
+  # Power management
+  powerManagement.cpuFreqGovernor = "performance";
+
+  # System state version
+  system.stateVersion = "24.05";  # Set to the latest stable version
+
+  # Home Manager configuration for user 'debug'
+  home-manager.users.debug = { pkgs, ... }: {
+    # SSH configuration
+    programs.ssh = {
+      enable = true;
+      startAgent = true;
+      config = {
+        host."github.com" = {
+          IdentityFile = "~/.ssh/github_ed25519";
+        };
+      };
+    };
+
+    # Create Applications directory in home
+    home.file."Applications" = {
+      isDirectory = true;
+      mode = "0755";
+    };
+
+    # Additional Home Manager configurations can be added here
+  };
 }
