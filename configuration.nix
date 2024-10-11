@@ -24,6 +24,7 @@ in
   networking.networkmanager.enable = true;
   networking.firewall = {
     enable = true;
+    logDenied = true;
     allowedTCPPorts = [ 22 80 443 ];  # Open ports for SSH and web
     allowedUDPPorts = [ 53 123 ];     # DNS and NTP
   };
@@ -31,6 +32,7 @@ in
 
   # Localization settings
   time.timeZone = "America/New_York";
+  time.hardwareClockInLocalTime = false;  # Set to true if your hardware clock is in local time
   i18n.defaultLocale = "en_US.UTF-8";
 
   # X server and desktop environment
@@ -70,7 +72,7 @@ in
   };
 
   # Nix settings
-  nix.settings.cores = 4;
+  nix.settings.cores = 0;  # Use all available cores dynamically
 
   # System packages
   environment.systemPackages = with pkgs; [
@@ -144,6 +146,11 @@ in
         MaxFileSec=1day
       '';
     };
+    openssh = {
+      enable = true;
+      permitRootLogin = "no";
+      passwordAuthentication = false;
+    };
   };
 
   # Kernel parameters and sysctl settings
@@ -155,11 +162,14 @@ in
         compressor = "lz4";
         maxPoolPercent = 20;
       };
-      sysctl = {
-        "vm.swappiness" = 10;
-        "kernel.perf_event_paranoid" = 2;
-      };
+      # Removed sysctl settings from here
     };
+  };
+
+  # Move sysctl settings to systemd.sysctl.settings
+  systemd.sysctl.settings = {
+    "vm.swappiness" = 10;
+    "kernel.perf_event_paranoid" = 2;
   };
 
   # File system configuration
@@ -185,6 +195,9 @@ in
 
   # Home Manager configuration for user 'debug'
   home-manager.users.debug = { pkgs, ... }: {
+    home.username = "debug";
+    home.homeDirectory = "/home/debug";
+
     # SSH configuration
     programs.ssh = {
       enable = true;
